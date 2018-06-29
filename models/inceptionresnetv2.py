@@ -20,7 +20,6 @@ pretrained_settings = {
     'input_range': [0, 1],
     'mean': [0.5, 0.5, 0.5],
     'std': [0.5, 0.5, 0.5],
-    'num_classes': 1000
 }
 
 
@@ -152,15 +151,15 @@ class Mixed_6a(nn.Module):
     def __init__(self):
         super(Mixed_6a, self).__init__()
 
-        self.branch0 = BasicConv2d(320, 384, kernel_size=3, stride=2)
+        self.branch0 = BasicConv2d(320, 384, kernel_size=3, stride=2, padding=1)
 
         self.branch1 = nn.Sequential(
             BasicConv2d(320, 256, kernel_size=1, stride=1),
             BasicConv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            BasicConv2d(256, 384, kernel_size=3, stride=2)
+            BasicConv2d(256, 384, kernel_size=3, stride=2, padding=1)
         )
 
-        self.branch2 = nn.MaxPool2d(3, stride=2)
+        self.branch2 = nn.MaxPool2d(3, stride=2, padding=1)
 
     def forward(self, x):
         x0 = self.branch0(x)
@@ -205,21 +204,21 @@ class Mixed_7a(nn.Module):
 
         self.branch0 = nn.Sequential(
             BasicConv2d(1088, 256, kernel_size=1, stride=1),
-            BasicConv2d(256, 384, kernel_size=3, stride=2)
+            BasicConv2d(256, 384, kernel_size=3, stride=2, padding=1)
         )
 
         self.branch1 = nn.Sequential(
             BasicConv2d(1088, 256, kernel_size=1, stride=1),
-            BasicConv2d(256, 288, kernel_size=3, stride=2)
+            BasicConv2d(256, 288, kernel_size=3, stride=2, padding=1)
         )
 
         self.branch2 = nn.Sequential(
             BasicConv2d(1088, 256, kernel_size=1, stride=1),
             BasicConv2d(256, 288, kernel_size=3, stride=1, padding=1),
-            BasicConv2d(288, 320, kernel_size=3, stride=2)
+            BasicConv2d(288, 320, kernel_size=3, stride=2, padding=1)
         )
 
-        self.branch3 = nn.MaxPool2d(3, stride=2)
+        self.branch3 = nn.MaxPool2d(3, stride=2, padding=1)
 
     def forward(self, x):
         x0 = self.branch0(x)
@@ -263,7 +262,7 @@ class Block8(nn.Module):
 
 class InceptionResNetV2(nn.Module):
 
-    def __init__(self, num_classes, tower_sizes):
+    def __init__(self, tower_sizes):
         super(InceptionResNetV2, self).__init__()
         # Special attributs
         self.input_space = None
@@ -275,13 +274,13 @@ class InceptionResNetV2(nn.Module):
             'repeat_2',
         ]
         # Modules
-        self.conv2d_1a = BasicConv2d(3, 32, kernel_size=3, stride=2)
+        self.conv2d_1a = BasicConv2d(3, 32, kernel_size=3, stride=2, padding=1)
         self.conv2d_2a = BasicConv2d(32, 32, kernel_size=3, stride=1, padding=1)
         self.conv2d_2b = BasicConv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.maxpool_3a = nn.MaxPool2d(3, stride=2)
+        self.maxpool_3a = nn.MaxPool2d(3, stride=2, padding=1)
         self.conv2d_3b = BasicConv2d(64, 80, kernel_size=1, stride=1)
         self.conv2d_4a = BasicConv2d(80, 192, kernel_size=3, stride=1, padding=1)
-        self.maxpool_5a = nn.MaxPool2d(3, stride=2)
+        self.maxpool_5a = nn.MaxPool2d(3, stride=2, padding=1)
         self.mixed_5b = Mixed_5b()
         self.repeat = get_blocks(Block35(scale=0.17), tower_sizes[0])
         self.mixed_6a = Mixed_6a()
@@ -290,10 +289,8 @@ class InceptionResNetV2(nn.Module):
         self.repeat_2 = get_blocks(Block8(scale=0.20), tower_sizes[2])
         self.block8 = Block8(noReLU=True)
         self.conv2d_7b = BasicConv2d(2080, 1536, kernel_size=1, stride=1)
-        self.avgpool_1a = nn.AdaptiveAvgPool2d(1)
-        self.last_linear = nn.Linear(1536, num_classes)
 
-    def features(self, input):
+    def forward(self, input):
         x = self.conv2d_1a(input)
         x = self.conv2d_2a(x)
         x = self.conv2d_2b(x)
@@ -311,26 +308,17 @@ class InceptionResNetV2(nn.Module):
         x = self.conv2d_7b(x)
         return x
 
-    def logits(self, features):
-        x = self.avgpool_1a(features)
-        x = x.view(x.size(0), -1)
-        x = self.last_linear(x)
-        x = F.log_softmax(x, dim=1)
-        return x
-
-    def forward(self, input):
-        x = self.features(input)
-        x = self.logits(x)
-        return x
+    
+def inceptionresnetv2():
+    return InceptionResNetV2([10, 20, 9])
 
 
-def inceptionresnetv2(num_classes, tower1_size=10, tower2_size=20, tower3_size=9, pretrained=True):
+def inceptionresnetv2_ex(pretrained=True, tower1_size=10, tower2_size=20, tower3_size=9):
     model = InceptionResNetV2(
-        num_classes,
         [tower1_size, tower2_size, tower3_size]
     )
     if pretrained:
-        signature = inspect.signature(inceptionresnetv2)
+        signature = inspect.signature(inceptionresnetv2_ex)
         if tower1_size != signature.parameters['tower1_size'].default:
             num_towers = 0
         elif tower2_size != signature.parameters['tower2_size'].default:
